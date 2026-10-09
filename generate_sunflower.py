@@ -196,6 +196,6 @@ html = f"""<!DOCTYPE html>
 </body>
 </html>"""
 
-with open("sunflower.html", "w", encoding="utf-8") as f:
+with open("index.html", "w", encoding="utf-8") as f:
     f.write(html)
-print(f"Generated sunflower.html with {len(html_parts)} words!")
+print(f"Generated index.html with {len(html_parts)} words!")
