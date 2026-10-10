@@ -12,28 +12,28 @@ languages = [
     "S'ayapaw", "Obicham te"
 ]
 
-# Track language usage count to guarantee variety
+short_languages = [
+    "Te amo", "Ti amo", "Je t'aime", "Eu te amo", "Te dua", "사랑해", 
+    "我爱你", "أحبك", "愛してる", "I love you", "Te iubesc", "Kocham cię", 
+    "Miluji tě", "Szeretlek", "Σ' αγαπώ"
+]
+
 usage_count = {lang: 0 for lang in languages}
 
 def get_char_width(ch, font_size):
     cp = ord(ch)
-    # CJK Unified, Hiragana, Katakana, Hangul (Korean)
     if (0x4E00 <= cp <= 0x9FFF or 
         0x3040 <= cp <= 0x30FF or 
         0xAC00 <= cp <= 0xD7AF or
         0xFF00 <= cp <= 0xFFEF):
         return font_size * 1.10
-    # Bengali, Devanagari, Thai
     if (0x0980 <= cp <= 0x09FF or 0x0900 <= cp <= 0x097F or 0x0E00 <= cp <= 0x0E7F):
         return font_size * 0.85
-    # Arabic, Hebrew, Greek, Cyrillic
     if (0x0600 <= cp <= 0x06FF or 0x0590 <= cp <= 0x05FF or 
         0x0370 <= cp <= 0x03FF or 0x0400 <= cp <= 0x04FF):
         return font_size * 0.70
-    # Wide latin
     if ch in "WMmw":
         return font_size * 0.82
-    # Narrow latin
     if ch in "ijlIt f'":
         return font_size * 0.35
     if ch == ' ':
@@ -46,8 +46,8 @@ def get_text_size(text, font_size):
     return w, h
 
 placed_boxes = []
-PADDING_X = 3.5  # Clean gap horizontally
-PADDING_Y = 2.5  # Clean gap vertically
+PADDING_X = 3.5  # Zero overlap guaranteed
+PADDING_Y = 2.5
 
 def check_overlap(x, y, w, h):
     for (bx, by, bw, bh) in placed_boxes:
@@ -55,92 +55,111 @@ def check_overlap(x, y, w, h):
             return True
     return False
 
-# ── Sunflower Shape Geometry (The exact beloved shape) ──
-CENTER_RADIUS = 190
-PETAL_LENGTH = 155
-NUM_PETALS = 18
+# ── Sunflower Shape Geometry ──
+# Center seed disk: solid circle of radius 175
+CENTER_RADIUS = 175
+# Petals: radiate outward by 130px (total radius 305px)
+PETAL_LENGTH = 130
+NUM_PETALS = 22  # 22 petals give dense, overlapping, crown-like flower head
+
+def get_petal_max_r(theta):
+    angle_slice = 2 * math.pi / NUM_PETALS
+    theta_mod = (theta % angle_slice) / angle_slice
+    # Petals are rounded with distinct points at tips
+    petal_curve = math.sin(theta_mod * math.pi) ** 0.85
+    return CENTER_RADIUS + PETAL_LENGTH * petal_curve
 
 def is_inside_flower(x, y):
     r = math.sqrt(x * x + y * y)
     if r < 40:  # Dead zone for "مومو"
         return False
     theta = math.atan2(y, x)
-    angle_slice = 2 * math.pi / NUM_PETALS
-    theta_mod = (theta % angle_slice) / angle_slice
-    petal_shape = math.sin(theta_mod * math.pi) ** 0.5
-    r_petal = CENTER_RADIUS + PETAL_LENGTH * petal_shape
-    return r < r_petal
+    return r < get_petal_max_r(theta)
 
 def is_inside_plant(x, y):
-    # Stem: 64px wide (-32 to 32)
-    if -32 <= x <= 32 and 150 <= y <= 850:
+    # Main stem: straight down from flower base
+    if -26 <= x <= 26 and 150 <= y <= 840:
         return True
-    # Upper right leaf: full and graceful
-    if 270 <= y <= 470:
-        leaf_progress = (y - 270) / 200
-        leaf_x_max = 180 * (math.sin(leaf_progress * math.pi) ** 0.8)
-        if 0 <= x <= 32 + leaf_x_max:
+    # Upper right broad sunflower leaf
+    if 260 <= y <= 470:
+        prog = (y - 260) / 210
+        lx = 185 * (math.sin(prog * math.pi) ** 0.85)
+        if 0 <= x <= 26 + lx:
             return True
-    # Lower left leaf: full and graceful
-    if 490 <= y <= 690:
-        leaf_progress = (y - 490) / 200
-        leaf_x_max = 180 * (math.sin(leaf_progress * math.pi) ** 0.8)
-        if -32 - leaf_x_max <= x <= 0:
+    # Lower left broad sunflower leaf
+    if 480 <= y <= 690:
+        prog = (y - 480) / 210
+        lx = 185 * (math.sin(prog * math.pi) ** 0.85)
+        if -26 - lx <= x <= 0:
             return True
     return False
 
 def can_place_flower_word(x, y, w, h):
-    for dx in [-w/2.0, w/2.0]:
-        for dy in [-h/2.0, h/2.0]:
-            if not is_inside_flower(x + dx, y + dy):
-                return False
-    return is_inside_flower(x, y)
+    # Word center must be inside
+    if not is_inside_flower(x, y):
+        return False
+    # Check bounding box points with slight margin for organic text contour
+    test_pts = [
+        (x - w * 0.45, y), (x + w * 0.45, y),
+        (x, y - h * 0.45), (x, y + h * 0.45),
+        (x - w * 0.40, y - h * 0.40), (x + w * 0.40, y - h * 0.40),
+        (x - w * 0.40, y + h * 0.40), (x + w * 0.40, y + h * 0.40)
+    ]
+    for px, py in test_pts:
+        if not is_inside_flower(px, py):
+            return False
+    return True
 
 def can_place_plant_word(x, y, w, h):
-    for dx in [-w/2.0, w/2.0]:
-        for dy in [-h/2.0, h/2.0]:
+    if not is_inside_plant(x, y):
+        return False
+    for dx in [-w * 0.45, w * 0.45]:
+        for dy in [-h * 0.45, h * 0.45]:
             if not is_inside_plant(x + dx, y + dy):
                 return False
-    return is_inside_plant(x, y)
+    return True
 
-# ── Generate candidate sample points ──
+def pick_balanced_word(candidate_pool):
+    return sorted(candidate_pool, key=lambda w: (usage_count[w], random.random()))
+
+# ── Sample Points ──
 points_flower = []
 
-# Fermat spiral for natural blooming
-c = 2.3
-for n in range(1, 42000):
+# 1. Fermat spiral across center and petals
+c = 2.1
+for n in range(1, 45000):
     r = c * math.sqrt(n)
     if r > CENTER_RADIUS + PETAL_LENGTH + 5:
         break
     theta = n * 137.508 * math.pi / 180
     points_flower.append((r * math.cos(theta), r * math.sin(theta)))
 
-# Targeted petal spines for all 18 petals
+# 2. Targeted Petal Spines for all 22 petals
 for p_idx in range(NUM_PETALS):
-    base_angle = p_idx * 2 * math.pi / NUM_PETALS + (math.pi / NUM_PETALS)
-    for r_step in range(int(CENTER_RADIUS * 0.75), int(CENTER_RADIUS + PETAL_LENGTH), 7):
-        for ang_offset in [-0.09, -0.05, 0.0, 0.05, 0.09]:
-            ang = base_angle + ang_offset
+    base_ang = p_idx * (2 * math.pi / NUM_PETALS) + (math.pi / NUM_PETALS)
+    for r_step in range(int(CENTER_RADIUS + PETAL_LENGTH - 8), int(CENTER_RADIUS * 0.8), -6):
+        for ang_offset in [-0.06, -0.03, 0.0, 0.03, 0.06]:
+            ang = base_ang + ang_offset
             points_flower.append((r_step * math.cos(ang), r_step * math.sin(ang)))
 
-# Random jitter across flower
-for _ in range(50000):
-    r = random.uniform(35, CENTER_RADIUS + PETAL_LENGTH)
+# 3. Dense random jitter across flower
+for _ in range(60000):
+    r = random.uniform(38, CENTER_RADIUS + PETAL_LENGTH)
     theta = random.uniform(0, 2 * math.pi)
     points_flower.append((r * math.cos(theta), r * math.sin(theta)))
 
 points_flower.sort(key=lambda p: math.sqrt(p[0]**2 + p[1]**2))
 
-# Dense grid & jitter for plant
+# Plant points
 points_plant = []
-for y_val in range(150, 855, 5):
-    for x_val in range(-220, 220, 5):
+for y_val in range(150, 845, 5):
+    for x_val in range(-215, 215, 5):
         if is_inside_plant(x_val, y_val):
             points_plant.append((x_val + random.uniform(-2, 2), y_val + random.uniform(-2, 2)))
 
 for _ in range(40000):
-    x_val = random.uniform(-220, 220)
-    y_val = random.uniform(150, 855)
+    x_val = random.uniform(-215, 215)
+    y_val = random.uniform(150, 845)
     if is_inside_plant(x_val, y_val):
         points_plant.append((x_val, y_val))
 
@@ -149,35 +168,36 @@ points_plant.sort(key=lambda p: p[1])
 html_parts = []
 delay = 0.0
 
-def pick_balanced_word(candidate_pool):
-    # Sort candidates by least used to ensure rich language diversity
-    sorted_candidates = sorted(candidate_pool, key=lambda w: (usage_count[w], random.random()))
-    return sorted_candidates
-
 # ── 1. Place Flower Words ──
 for x, y in points_flower:
     r = math.sqrt(x * x + y * y)
     is_center = (r < CENTER_RADIUS)
     
-    candidate_list = pick_balanced_word(languages)
-    
-    # Try top least-used candidates
-    for word in candidate_list[:8]:
-        font_size = random.randint(10, 13) if is_center else random.randint(12, 16)
-        w, h = get_text_size(word, font_size)
+    # Outer petals prioritize shorter words so all 22 petals fill completely
+    if r > CENTER_RADIUS + 35:
+        candidates = pick_balanced_word(short_languages)
+        font_size = random.randint(11, 14)
+    elif is_center:
+        candidates = pick_balanced_word(languages)
+        font_size = random.randint(10, 13)
+    else:
+        candidates = pick_balanced_word(languages)
+        font_size = random.randint(12, 15)
         
+    for word in candidates[:6]:
+        w, h = get_text_size(word, font_size)
         if can_place_flower_word(x, y, w, h) and not check_overlap(x, y, w, h):
             placed_boxes.append((x, y, w, h))
             usage_count[word] += 1
             
             if is_center:
-                # Warm, readable amber / copper / bronze tones
+                # Beautiful, readable amber/copper/bronze tones
                 if r < CENTER_RADIUS * 0.55:
                     color = random.choice(["#8B4513", "#A0522D", "#964B00", "#7A3803", "#6E3502"])
                 else:
                     color = random.choice(["#CD853F", "#D2691E", "#B8860B", "#CC7722", "#E08934"])
             else:
-                # Brilliant, glowing sunflower yellow/gold tones
+                # Radiant sunflower yellow/gold tones
                 color = random.choice(["#FFD700", "#FFC700", "#FFB700", "#FFA500", "#FFD020", "#FFE066"])
                 
             left = 500 + x
@@ -189,21 +209,22 @@ for x, y in points_flower:
             delay += 0.012
             break
 
-# ── 2. Place Plant (Stem & Leaves) Words ──
+# ── 2. Place Plant Words ──
 for x, y in points_plant:
-    candidate_list = pick_balanced_word(languages)
-    
-    for word in candidate_list[:8]:
-        font_size = random.randint(11, 14) if abs(x) < 32 else random.randint(11, 15)
-        w, h = get_text_size(word, font_size)
+    if abs(x) < 26:
+        candidates = pick_balanced_word(short_languages)
+        font_size = random.randint(11, 13)
+    else:
+        candidates = pick_balanced_word(languages)
+        font_size = random.randint(11, 15)
         
+    for word in candidates[:6]:
+        w, h = get_text_size(word, font_size)
         if can_place_plant_word(x, y, w, h) and not check_overlap(x, y, w, h):
             placed_boxes.append((x, y, w, h))
             usage_count[word] += 1
             
-            # Rich, lush green tones
             color = random.choice(["#2E7D32", "#388E3C", "#43A047", "#1B5E20", "#4CAF50", "#558B2F", "#66BB6A"])
-            
             left = 500 + x
             top = 350 + y
             html_parts.append(
