@@ -118,11 +118,11 @@ for x, y in points_to_check:
     word = random.choice(languages)
     
     if part_type == "center":
-        font_size = random.randint(7, 10) # Very small for dense seeds
+        font_size = random.randint(11, 15) # Bigger for readability
     elif part_type == "petal":
-        font_size = random.randint(10, 15)
+        font_size = random.randint(15, 21)
     else:
-        font_size = random.randint(11, 16)
+        font_size = random.randint(15, 22)
         
     w, h = get_text_size(word, font_size)
     
@@ -147,8 +147,8 @@ for x, y in points_to_check:
         html_parts.append(f'<div class="word" style="left:{left:.1f}px; top:{top:.1f}px; color:{color}; font-size:{font_size}px; animation-delay:{delay:.2f}s;">{word}</div>')
         delay += 0.02 # Faster animation since there are more words
 
-# Add Mumu in Arabic in the center
-html_parts.append(f'<div class="word" style="left:500px; top:350px; color:#FFD700; font-size:65px; font-weight:bold; animation-delay:0s; text-shadow: 0px 0px 20px rgba(255, 215, 0, 0.5);">مومو</div>')
+# Add Mumu in Arabic in the center (smaller, subtle)
+html_parts.append(f'<div class="word" style="left:500px; top:350px; color:#FFD700; font-size:44px; font-weight:bold; animation-delay:0s; text-shadow: 0px 0px 20px rgba(255, 215, 0, 0.5);">مومو</div>')
 
 html = f"""<!DOCTYPE html>
 <html lang="en">
